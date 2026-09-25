@@ -1,255 +1,258 @@
 import base64
 import streamlit as st
-
 from crypto_core import (
     AES_256_GCM,
     CHACHA20_POLY1305,
+    MAGIC,
+    SALT_SIZE,
     DecryptionFailed,
     InvalidEncryptedData,
-    encrypt_bytes,
+    _key,
     decrypt_bytes,
-    encrypt_text,
     decrypt_text,
+    encrypt_bytes,
+    encrypt_text,
 )
 
+# Konfigurasi Halaman
 st.set_page_config(
-    page_title="Aplikasi Kriptografi",
-    page_icon="",
+    page_title="Enkripsi & Dekripsi",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
-st.title("Aplikasi Kriptografi")
-st.caption("Enkripsi dan dekripsi teks atau berkas menggunakan AES-256-GCM / ChaCha20-Poly1305.")
-
-# =========================
-# Sidebar
-# =========================
-with st.sidebar:
-    st.header("Pengaturan")
-
-    mode = st.radio(
-        "Pilih operasi",
-        ["Enkripsi", "Dekripsi"],
-    )
-
-    algorithm = st.selectbox(
-        "Pilih algoritma",
-        [AES_256_GCM, CHACHA20_POLY1305],
-    )
-
-    password = st.text_input(
-        "Kata sandi",
-        type="password",
-        help="Kata sandi digunakan untuk menurunkan kunci enkripsi.",
-    )
-
-    if mode == "Enkripsi":
-        st.info("Untuk enkripsi, hasil berkas akan menggunakan format .kripto.")
-    else:
-        st.info("Untuk dekripsi berkas, unggah berkas hasil enkripsi dengan ekstensi .kripto.")
-
-
-# =========================
-# Pilih jenis input
-# =========================
-input_type = st.radio(
-    "Jenis input",
-    ["Teks", "Berkas"],
-    horizontal=True,
+# Style Kustom Dashboard
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #0d1117;
+        color: #c9d1d9;
+    }
+    .block-container {
+        padding-top: 2rem;
+        max-width: 1200px;
+    }
+    [data-testid="column"] > div {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 20px;
+    }
+    div.stButton > button[kind="primary"] {
+        background-color: #238636;
+        border: 1px solid rgba(240,246,252,0.1);
+        color: #ffffff;
+        font-weight: 600;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        background-color: #2ea043;
+    }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
-st.divider()
+# Fungsi Bantuan untuk Ekstraksi Kunci Hex dari Payload
+def get_key_from_encrypted_payload(encrypted_bytes: bytes, password: str) -> str:
+    """Mengekstrak salt dari header paket .kripto dan merumuskan kunci Hex."""
+    salt_start = len(MAGIC) + 1
+    salt = encrypted_bytes[salt_start : salt_start + SALT_SIZE]
+    derived_key = _key(password, salt)
+    return derived_key.hex()
 
-# =========================
-# ENKRIPSI
-# =========================
-if mode == "Enkripsi":
-    if input_type == "Teks":
-        st.subheader("Enkripsi Teks")
+# Header Utama
+st.title("Enkripsi & Dekripsi")
+st.caption("Platform Enkripsi & Dekripsi")
 
-        text_input = st.text_area(
-            "Masukkan teks",
-            height=200,
-            placeholder="Contoh: Halo dunia!",
+# Modul Navigasi Utama
+mode_data = st.segmented_control(
+    "Target Pemrosesan Data",
+    options=["Modul Teks", "Modul Berkas"],
+    default="Modul Teks",
+)
+
+st.write("")
+
+# ==========================================
+# MODUL TEKS
+# ==========================================
+if mode_data == "Modul Teks":
+    col_left, col_right = st.columns([1, 1], gap="large")
+
+    with col_left:
+        st.subheader("Input & Parameter")
+        
+        operation = st.radio(
+            "Operasi Teks",
+            ["Enkripsi Teks", "Dekripsi Teks"],
+            horizontal=True,
+            label_visibility="collapsed",
         )
+        
+        st.write("")
+        
+        if operation == "Enkripsi Teks":
+            text_input = st.text_area(
+                "Teks Asli (Plaintext)",
+                placeholder="Tuliskan data sensitif atau pesan di sini...",
+                height=160,
+            )
+            algorithm = st.selectbox("Algoritma AEAD", [AES_256_GCM, CHACHA20_POLY1305])
+        else:
+            text_input = st.text_area(
+                "Payload Terenkripsi (Base64)",
+                placeholder="Tempelkan string Base64 terenkripsi di sini...",
+                height=160,
+            )
+            
+        password = st.text_input("Kata Sandi Otorisasi", type="password")
+        
+        st.write("")
+        submit_text = st.button("Jalankan Pemrosesan", type="primary", use_container_width=True)
 
-        if st.button("Enkripsi Teks", type="primary", use_container_width=True):
+    with col_right:
+        st.subheader("Hasil & Inspeksi Kunci")
+        
+        if submit_text:
             if not password:
-                st.error("Kata sandi wajib diisi.")
+                st.error("Kata sandi otorisasi wajib diisi.")
             elif not text_input:
-                st.error("Teks belum diisi.")
+                st.warning("Input data tidak boleh kosong.")
             else:
-                try:
-                    result = encrypt_text(text_input, password, algorithm)
+                if operation == "Enkripsi Teks":
+                    try:
+                        result_b64 = encrypt_text(text_input, password, algorithm)
+                        
+                        # Ekstraksi Kunci
+                        raw_bytes = base64.b64decode(result_b64)
+                        key_hex = get_key_from_encrypted_payload(raw_bytes, password)
+                        
+                        st.success("Proses enkripsi berhasil.")
+                        
+                        # Tampilan Kunci Turunan (Derived Key)
+                        st.text_input("Kunci Turunan Scrypt 256-bit (HEX)", value=key_hex, help="Kunci enkripsi yang dihasilkan dari Scrypt KDF.")
+                        
+                        st.code(result_b64, language="text", wrap_lines=True)
+                        st.download_button(
+                            label="Unduh File Ciphertext (.txt)",
+                            data=result_b64,
+                            file_name="ciphertext.txt",
+                            mime="text/plain",
+                            use_container_width=True,
+                        )
+                    except Exception as err:
+                        st.error(f"Gagal memproses data: {err}")
+                else:
+                    try:
+                        raw_bytes = base64.b64decode(text_input.strip())
+                        decrypted = decrypt_text(text_input.strip(), password)
+                        
+                        # Ekstraksi Kunci saat dekripsi berhasil
+                        key_hex = get_key_from_encrypted_payload(raw_bytes, password)
+                        
+                        st.success("Otentikasi valid. Dekripsi berhasil.")
+                        st.text_input("Kunci Turunan Scrypt 256-bit (HEX)", value=key_hex, help="Kunci dekripsi yang diekstrak menggunakan Salt dari paket.")
+                        st.text_area("Plaintext Dipulihkan", value=decrypted, height=140)
+                    except DecryptionFailed:
+                        st.error("Gagal mendekripsi: Kata sandi salah atau isi data telah terubah.")
+                    except InvalidEncryptedData:
+                        st.error("Gagal mendekripsi: Format data Base64 tidak sesuai standar paket.")
+                    except Exception as err:
+                        st.error(f"Gagal memproses data: {err}")
+        else:
+            st.info("Hasil pemrosesan dan kunci akan ditampilkan di area ini setelah tombol dijalankan.")
 
-                    st.success("Teks berhasil dienkripsi.")
-
-                    st.subheader("Hasil Base64")
-                    st.code(result, language="text")
-
-                    # Text area dapat dipilih dan disalin dengan Ctrl+C.
-                    st.text_area(
-                        "Base64 (siap disalin)",
-                        value=result,
-                        height=180,
-                    )
-
-                    st.download_button(
-                        "Unduh hasil Base64",
-                        data=result.encode("utf-8"),
-                        file_name="hasil_enkripsi_base64.txt",
-                        mime="text/plain",
-                        use_container_width=True,
-                    )
-
-                except Exception as exc:
-                    st.error(f"Enkripsi gagal: {exc}")
-
-    else:
-        st.subheader("Enkripsi Berkas")
-
-        uploaded_file = st.file_uploader(
-            "Unggah berkas yang ingin dienkripsi",
-            type=None,
-        )
-
-        if uploaded_file is not None:
-            st.write(f"**Nama:** {uploaded_file.name}")
-            st.write(f"**Ukuran:** {uploaded_file.size:,} byte")
-
-        if st.button("Enkripsi Berkas", type="primary", use_container_width=True):
-            if not password:
-                st.error("Kata sandi wajib diisi.")
-            elif uploaded_file is None:
-                st.error("Berkas belum diunggah.")
-            else:
-                try:
-                    original_data = uploaded_file.getvalue()
-                    encrypted_data = encrypt_bytes(
-                        original_data,
-                        password,
-                        algorithm,
-                    )
-
-                    output_name = f"{uploaded_file.name}.kripto"
-
-                    st.success("Berkas berhasil dienkripsi.")
-
-                    st.download_button(
-                        "Unduh berkas terenkripsi",
-                        data=encrypted_data,
-                        file_name=output_name,
-                        mime="application/octet-stream",
-                        use_container_width=True,
-                    )
-
-                    st.subheader("Representasi Base64")
-                    encoded = base64.b64encode(encrypted_data).decode("ascii")
-
-                    st.text_area(
-                        "Base64 (siap disalin)",
-                        value=encoded,
-                        height=180,
-                    )
-
-                except Exception as exc:
-                    st.error(f"Enkripsi gagal: {exc}")
-
-
-# =========================
-# DEKRIPSI
-# =========================
+# ==========================================
+# MODUL BERKAS
+# ==========================================
 else:
-    if input_type == "Teks":
-        st.subheader("Dekripsi Teks")
+    col_left, col_right = st.columns([1, 1], gap="large")
 
-        encrypted_text = st.text_area(
-            "Masukkan Base64 hasil enkripsi",
-            height=200,
-            placeholder="Tempel Base64 di sini...",
+    with col_left:
+        st.subheader("Manajemen Berkas")
+        
+        file_op = st.radio(
+            "Operasi Berkas",
+            ["Enkripsi Berkas", "Dekripsi Berkas"],
+            horizontal=True,
+            label_visibility="collapsed",
         )
+        
+        st.write("")
+        
+        if file_op == "Enkripsi Berkas":
+            uploaded_file = st.file_uploader("Pilih Berkas Asli", type=None)
+            algorithm = st.selectbox("Algoritma AEAD", [AES_256_GCM, CHACHA20_POLY1305], key="file_alg")
+        else:
+            uploaded_file = st.file_uploader("Pilih Berkas Terenkripsi (.kripto)", type=["kripto"])
+            
+        password = st.text_input("Kata Sandi Otorisasi", type="password", key="file_pass")
+        
+        st.write("")
+        submit_file = st.button("Jalankan Pemrosesan Berkas", type="primary", use_container_width=True)
 
-        if st.button("Dekripsi Teks", type="primary", use_container_width=True):
+    with col_right:
+        st.subheader("Ringkasan & Inspeksi Kunci")
+        
+        if uploaded_file:
+            st.metric(label="Nama Berkas Upload", value=uploaded_file.name)
+            st.metric(label="Ukuran Berkas", value=f"{uploaded_file.size / 1024:.2f} KB")
+            st.divider()
+
+        if submit_file:
             if not password:
-                st.error("Kata sandi wajib diisi.")
-            elif not encrypted_text.strip():
-                st.error("Base64 belum diisi.")
+                st.error("Kata sandi otorisasi wajib diisi.")
+            elif not uploaded_file:
+                st.warning("Silakan unggah berkas terlebih dahulu.")
             else:
-                try:
-                    original_text = decrypt_text(
-                        encrypted_text.strip(),
-                        password,
-                    )
-
-                    st.success("Teks berhasil didekripsi.")
-
-                    st.subheader("Hasil Dekripsi")
-                    st.text_area(
-                        "Teks asli",
-                        value=original_text,
-                        height=200,
-                    )
-
-                    st.download_button(
-                        "Unduh hasil dekripsi",
-                        data=original_text.encode("utf-8"),
-                        file_name="hasil_dekripsi.txt",
-                        mime="text/plain",
-                        use_container_width=True,
-                    )
-
-                except (DecryptionFailed, InvalidEncryptedData) as exc:
-                    st.error(f"Dekripsi gagal: {exc}")
-                except UnicodeDecodeError:
-                    st.error("Data berhasil didekripsi tetapi bukan teks UTF-8 yang valid.")
-                except Exception as exc:
-                    st.error(f"Dekripsi gagal: {exc}")
-
-    else:
-        st.subheader("Dekripsi Berkas")
-
-        uploaded_file = st.file_uploader(
-            "Unggah berkas .kripto",
-            type=["kripto"],
-        )
-
-        if uploaded_file is not None:
-            st.write(f"**Nama:** {uploaded_file.name}")
-            st.write(f"**Ukuran:** {uploaded_file.size:,} byte")
-
-        if st.button("Dekripsi Berkas", type="primary", use_container_width=True):
-            if not password:
-                st.error("Kata sandi wajib diisi.")
-            elif uploaded_file is None:
-                st.error("Berkas .kripto belum diunggah.")
-            else:
-                try:
-                    encrypted_data = uploaded_file.getvalue()
-                    decrypted_data = decrypt_bytes(
-                        encrypted_data,
-                        password,
-                    )
-
-                    if uploaded_file.name.lower().endswith(".kripto"):
-                        output_name = uploaded_file.name[:-7]
-                    else:
-                        output_name = f"{uploaded_file.name}.decrypted"
-
-                    st.success("Berkas berhasil didekripsi.")
-
-                    st.download_button(
-                        "Unduh berkas hasil dekripsi",
-                        data=decrypted_data,
-                        file_name=output_name,
-                        mime="application/octet-stream",
-                        use_container_width=True,
-                    )
-
-                except (DecryptionFailed, InvalidEncryptedData) as exc:
-                    st.error(f"Dekripsi gagal: {exc}")
-                except Exception as exc:
-                    st.error(f"Dekripsi gagal: {exc}")
-
-
-st.divider()
-st.caption("Catatan: aplikasi ini memproses seluruh isi berkas di memori dan sesuai modul ditujukan untuk ukuran uji hingga 10 MB.")
+                file_bytes = uploaded_file.getvalue()
+                
+                if file_op == "Enkripsi Berkas":
+                    try:
+                        encrypted_bytes = encrypt_bytes(file_bytes, password, algorithm)
+                        key_hex = get_key_from_encrypted_payload(encrypted_bytes, password)
+                        out_name = f"{uploaded_file.name}.kripto"
+                        
+                        st.success("Enkripsi berkas selesai.")
+                        st.text_input("Kunci Turunan Scrypt 256-bit (HEX)", value=key_hex)
+                        
+                        st.download_button(
+                            label=f"Unduh {out_name}",
+                            data=encrypted_bytes,
+                            file_name=out_name,
+                            mime="application/octet-stream",
+                            use_container_width=True,
+                        )
+                    except Exception as err:
+                        st.error(f"Gagal memproses berkas: {err}")
+                else:
+                    try:
+                        decrypted_bytes = decrypt_bytes(file_bytes, password)
+                        key_hex = get_key_from_encrypted_payload(file_bytes, password)
+                        
+                        orig_name = uploaded_file.name
+                        out_name = orig_name[:-7] if orig_name.endswith(".kripto") else f"restored_{orig_name}"
+                        
+                        st.success("Otentikasi sukses. Berkas dipulihkan.")
+                        st.text_input("Kunci Turunan Scrypt 256-bit (HEX)", value=key_hex)
+                        
+                        st.download_button(
+                            label=f"Unduh {out_name}",
+                            data=decrypted_bytes,
+                            file_name=out_name,
+                            mime="application/octet-stream",
+                            use_container_width=True,
+                        )
+                    except DecryptionFailed:
+                        st.error("Gagal mendekripsi: Kata sandi salah atau berkas terenkripsi telah rusak/diubah.")
+                    except InvalidEncryptedData:
+                        st.error("Gagal mendekripsi: Format berkas bukan merupakan paket .kripto v1 yang valid.")
+                    except Exception as err:
+                        st.error(f"Gagal memproses berkas: {err}")
+        else:
+            if not uploaded_file:
+                st.info("Unggah berkas di panel sebelah kiri untuk memulai pemrosesan.")
