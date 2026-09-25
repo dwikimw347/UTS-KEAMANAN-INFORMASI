@@ -13,7 +13,7 @@ python -m pip install -r requirements.txt
 python -m unittest -v
 ```
 
-## Contoh pemakaian untuk Orang 2 (Streamlit)
+## Contoh pemakaian untuk Streamlit
 
 ```python
 from crypto_core import (
