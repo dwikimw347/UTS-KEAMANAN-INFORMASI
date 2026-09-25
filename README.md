@@ -57,3 +57,9 @@ dirancang ulang untuk pemrosesan bertahap.
 Kata sandi pada contoh dan unit test hanyalah data contoh, bukan kredensial
 aplikasi. Aplikasi akhir harus menerima kata sandi dari pengguna dan tidak
 menyimpannya di kode sumber atau repositori.
+
+
+## Cara Running
+
+pip install streamlit cryptography 
+python -m streamlit run app.py
