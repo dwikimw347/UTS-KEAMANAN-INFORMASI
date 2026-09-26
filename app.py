@@ -58,7 +58,8 @@ st.markdown(
 
 # Fungsi Bantuan untuk Ekstraksi Kunci Hex dari Payload
 def get_key_from_encrypted_payload(encrypted_bytes: bytes, password: str) -> str:
-    """Mengekstrak salt dari header paket .kripto dan merumuskan kunci Hex."""
+    if len(encrypted_bytes) < len(MAGIC) + 1 + SALT_SIZE:
+        raise InvalidEncryptedData("Header berkas tidak valid.")
     salt_start = len(MAGIC) + 1
     salt = encrypted_bytes[salt_start : salt_start + SALT_SIZE]
     derived_key = _key(password, salt)
@@ -115,7 +116,7 @@ if mode_data == "Modul Teks":
         submit_text = st.button("Jalankan Pemrosesan", type="primary", use_container_width=True)
 
     with col_right:
-        st.subheader("Hasil & Inspeksi Kunci")
+        st.subheader("Hasil")
         
         if submit_text:
             if not password:
@@ -132,9 +133,6 @@ if mode_data == "Modul Teks":
                         key_hex = get_key_from_encrypted_payload(raw_bytes, password)
                         
                         st.success("Proses enkripsi berhasil.")
-                        
-                        # Tampilan Kunci Turunan (Derived Key)
-                        st.text_input("Kunci Turunan Scrypt 256-bit (HEX)", value=key_hex, help="Kunci enkripsi yang dihasilkan dari Scrypt KDF.")
                         
                         st.code(result_b64, language="text", wrap_lines=True)
                         st.download_button(
@@ -196,7 +194,7 @@ else:
         submit_file = st.button("Jalankan Pemrosesan Berkas", type="primary", use_container_width=True)
 
     with col_right:
-        st.subheader("Ringkasan & Inspeksi Kunci")
+        st.subheader("Ringkasan & Hasil")
         
         if uploaded_file:
             st.metric(label="Nama Berkas Upload", value=uploaded_file.name)
@@ -218,7 +216,6 @@ else:
                         out_name = f"{uploaded_file.name}.kripto"
                         
                         st.success("Enkripsi berkas selesai.")
-                        st.text_input("Kunci Turunan Scrypt 256-bit (HEX)", value=key_hex)
                         
                         st.download_button(
                             label=f"Unduh {out_name}",
