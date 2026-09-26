@@ -1,4 +1,4 @@
-# Modul kriptografi Topik A 
+# Modul kriptografi Topik A
 
 Modul Python untuk mengenkripsi dan mendekripsi teks atau berkas dengan
 AES-256-GCM atau ChaCha20-Poly1305. Kunci 256-bit diturunkan dari kata sandi
@@ -22,7 +22,7 @@ from crypto_core import (
     encrypt_bytes, decrypt_bytes, encrypt_text, decrypt_text,
 )
 
-# Teks: hasil Base64 siap ditampilkan atau disalin.
+# Teks: hasil dari Base64 siap ditampilkan atau disalin.
 encoded = encrypt_text("Halo dunia", "kata sandi pengguna", AES_256_GCM)
 original_text = decrypt_text(encoded, "kata sandi pengguna")
 
@@ -58,8 +58,7 @@ Kata sandi pada contoh dan unit test hanyalah data contoh, bukan kredensial
 aplikasi. Aplikasi akhir harus menerima kata sandi dari pengguna dan tidak
 menyimpannya di kode sumber atau repositori.
 
-
 ## Cara Running
 
-pip install streamlit cryptography 
+pip install streamlit cryptography
 python -m streamlit run app.py
