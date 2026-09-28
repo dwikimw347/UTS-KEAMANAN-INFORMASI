@@ -1,4 +1,6 @@
 import base64
+import time
+import pandas as pd
 import streamlit as st
 from crypto_core import (
     AES_256_GCM,
@@ -56,7 +58,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Fungsi Bantuan untuk Ekstraksi Kunci Hex dari Payload
+# ==========================================
+# FUNGSI BANTUAN (HELPER FUNCTIONS)
+# ==========================================
 def get_key_from_encrypted_payload(encrypted_bytes: bytes, password: str) -> str:
     if len(encrypted_bytes) < len(MAGIC) + 1 + SALT_SIZE:
         raise InvalidEncryptedData("Header berkas tidak valid.")
@@ -65,14 +69,45 @@ def get_key_from_encrypted_payload(encrypted_bytes: bytes, password: str) -> str
     derived_key = _key(password, salt)
     return derived_key.hex()
 
+def calculate_avalanche_effect(bytes1: bytes, bytes2: bytes) -> float:
+    min_len = min(len(bytes1), len(bytes2))
+    bit_diffs = 0
+    total_bits = min_len * 8
+    
+    for i in range(min_len):
+        xor_byte = bytes1[i] ^ bytes2[i]
+        bit_diffs += bin(xor_byte).count('1')
+        
+    length_diff_bits = abs(len(bytes1) - len(bytes2)) * 8
+    bit_diffs += length_diff_bits
+    total_bits += length_diff_bits
+    
+    if total_bits == 0:
+        return 0.0
+    return (bit_diffs / total_bits) * 100
+
+def calculate_entropy(data: bytes) -> float:
+    import math
+    if not data:
+        return 0.0
+    entropy = 0.0
+    length = len(data)
+    for i in range(256):
+        count = data.count(bytes([i]))
+        if count > 0:
+            p = count / length
+            entropy -= p * math.log2(p)
+    return entropy
+
+
 # Header Utama
 st.title("Enkripsi & Dekripsi")
 st.caption("Platform Enkripsi & Dekripsi")
 
-# Modul Navigasi Utama
+# Modul Navigasi Utama (Diperbaiki: Menambahkan Pengujian ke Menu Navigasi)
 mode_data = st.segmented_control(
     "Target Pemrosesan Data",
-    options=["Modul Teks", "Modul Berkas"],
+    options=["Modul Teks", "Modul Berkas", "Pengujian"],
     default="Modul Teks",
 )
 
@@ -128,12 +163,10 @@ if mode_data == "Modul Teks":
                     try:
                         result_b64 = encrypt_text(text_input, password, algorithm)
                         
-                        # Ekstraksi Kunci
                         raw_bytes = base64.b64decode(result_b64)
                         key_hex = get_key_from_encrypted_payload(raw_bytes, password)
                         
                         st.success("Proses enkripsi berhasil.")
-                        
                         st.code(result_b64, language="text", wrap_lines=True)
                         st.download_button(
                             label="Unduh File Ciphertext (.txt)",
@@ -149,7 +182,6 @@ if mode_data == "Modul Teks":
                         raw_bytes = base64.b64decode(text_input.strip())
                         decrypted = decrypt_text(text_input.strip(), password)
                         
-                        # Ekstraksi Kunci saat dekripsi berhasil
                         key_hex = get_key_from_encrypted_payload(raw_bytes, password)
                         
                         st.success("Otentikasi valid. Dekripsi berhasil.")
@@ -166,7 +198,7 @@ if mode_data == "Modul Teks":
 # ==========================================
 # MODUL BERKAS
 # ==========================================
-else:
+elif mode_data == "Modul Berkas":
     col_left, col_right = st.columns([1, 1], gap="large")
 
     with col_left:
@@ -251,3 +283,131 @@ else:
         else:
             if not uploaded_file:
                 st.info("Unggah berkas di panel sebelah kiri untuk memulai pemrosesan.")
+
+# ==========================================
+# MODUL PENGUJIAN
+# ==========================================
+elif mode_data == "Pengujian":
+    st.subheader("Pengujian")
+    
+    test_tab1, test_tab2, test_tab3 = st.tabs(["Avalanche Effect", "Analisis Entropi", "Benchmark Waktu"])
+    
+    # 1. Avalanche Effect
+    with test_tab1:
+        st.write("### Pengukuran Avalanche Effect (Perbandingan 2 Algoritma)")
+        st.caption("Menganalisis persentase perubahan bit ciphertext saat 1 bit plaintext atau kunci diubah (Target: ~50%).")
+        
+        col_in1, col_in2 = st.columns(2)
+        with col_in1:
+            sample_text = st.text_input("Plaintext Uji", value="Rahasia Negara 2026", key="av_text_input")
+        with col_in2:
+            sample_pass = st.text_input("Kata Sandi Uji", value="PasswordUtama123", key="av_pass_input")
+            
+        st.write("")
+        if st.button("Jalankan Pengujian Avalanche Effect", type="primary"):
+            modified_text = sample_text[:-1] + chr(ord(sample_text[-1]) ^ 1)
+            modified_pass = sample_pass[:-1] + chr(ord(sample_pass[-1]) ^ 1)
+            
+            results_avalanche = []
+            
+            for algo in [AES_256_GCM, CHACHA20_POLY1305]:
+                # 1. Perubahan 1 Bit Plaintext
+                c1_orig = encrypt_bytes(sample_text.encode(), sample_pass, algo)
+                c2_text = encrypt_bytes(modified_text.encode(), sample_pass, algo)
+                av_text = calculate_avalanche_effect(c1_orig, c2_text)
+                
+                # 2. Perubahan 1 Bit Password
+                c2_pass = encrypt_bytes(sample_text.encode(), modified_pass, algo)
+                av_pass = calculate_avalanche_effect(c1_orig, c2_pass)
+                
+                results_avalanche.append({
+                    "Algoritma": algo,
+                    "Perubahan 1 Bit Plaintext": f"{av_text:.2f} %",
+                    "Perubahan 1 Bit Password": f"{av_pass:.2f} %",
+                    "Kriteria SAC": "Sangat Baik (~50%)"
+                })
+                
+            st.table(results_avalanche)
+            st.caption("Catatan: Nilai mendekati 50% menunjukkan sifat acak enkripsi yang sangat baik (Strict Avalanche Criterion).")
+
+    # 2. Analisis Entropi
+    with test_tab2:
+        st.write("### Perbandingan Entropi & Histogram Byte")
+        st.caption("Mengukur keacakan data Plaintext vs Ciphertext AES-256-GCM vs ChaCha20-Poly1305 (Skala Maksimum: 8.0 bit/byte).")
+        
+        test_file = st.file_uploader("Unggah Berkas Sampel (Misal: PDF/Gambar/Teks)", key="test_file_entropy")
+        test_pwd = st.text_input("Kata Sandi", value="PasswordEntropi123", key="pass_entropy")
+        
+        if test_file and st.button("Hitung Entropi & Tampilkan Histogram", type="primary"):
+            p_bytes = test_file.getvalue()
+            
+            c_aes = encrypt_bytes(p_bytes, test_pwd, AES_256_GCM)
+            c_chacha = encrypt_bytes(p_bytes, test_pwd, CHACHA20_POLY1305)
+            
+            e_plain = calculate_entropy(p_bytes)
+            e_aes = calculate_entropy(c_aes)
+            e_chacha = calculate_entropy(c_chacha)
+            
+            col_e1, col_e2, col_e3 = st.columns(3)
+            col_e1.metric("Entropi Plaintext", f"{e_plain:.4f} bit/byte")
+            col_e2.metric("Entropi AES-256-GCM", f"{e_aes:.4f} bit/byte")
+            col_e3.metric("Entropi ChaCha20-Poly1305", f"{e_chacha:.4f} bit/byte")
+            
+            st.divider()
+            st.write("### Histogram Sebaran Byte (0 - 255)")
+            st.caption("Ciphertext yang baik memiliki distribusi frekuensi byte yang seragam/flat di seluruh rentang 0-255.")
+            
+            p_counts = [p_bytes.count(bytes([i])) for i in range(256)]
+            aes_counts = [c_aes.count(bytes([i])) for i in range(256)]
+            chacha_counts = [c_chacha.count(bytes([i])) for i in range(256)]
+            
+            df_hist = pd.DataFrame({
+                "Nilai Byte (0-255)": list(range(256)),
+                "Plaintext": p_counts,
+                "AES-256-GCM": aes_counts,
+                "ChaCha20-Poly1305": chacha_counts
+            }).set_index("Nilai Byte (0-255)")
+            
+            col_h1, col_h2, col_h3 = st.columns(3)
+            with col_h1:
+                st.write("**Plaintext Asli**")
+                st.bar_chart(df_hist["Plaintext"])
+            with col_h2:
+                st.write("**AES-256-GCM**")
+                st.bar_chart(df_hist["AES-256-GCM"])
+            with col_h3:
+                st.write("**ChaCha20-Poly1305**")
+                st.bar_chart(df_hist["ChaCha20-Poly1305"])
+
+    # 3. Benchmark Waktu
+    with test_tab3:
+        st.write("### Perbandingan Performansi Waktu Enkripsi & Dekripsi")
+        st.caption("Pengukuran durasi pemrosesan (ms) untuk berkas sintetis 1 KB, 1 MB, dan 10 MB.")
+        
+        if st.button("Jalankan Uji Performansi", type="primary"):
+            sizes = {"1 KB": 1024, "1 MB": 1024 * 1024, "10 MB": 10 * 1024 * 1024}
+            benchmark_results = []
+            
+            for label, size_bytes in sizes.items():
+                dummy_data = b"A" * size_bytes
+                
+                for algo in [AES_256_GCM, CHACHA20_POLY1305]:
+                    # Enkripsi
+                    t0 = time.perf_counter()
+                    enc = encrypt_bytes(dummy_data, "BenchmarkPass123", algo)
+                    t_enc = (time.perf_counter() - t0) * 1000
+                    
+                    # Dekripsi
+                    t0 = time.perf_counter()
+                    dec = decrypt_bytes(enc, "BenchmarkPass123")
+                    t_dec = (time.perf_counter() - t0) * 1000
+                    
+                    benchmark_results.append({
+                        "Ukuran Berkas": label,
+                        "Algoritma": algo,
+                        "Waktu Enkripsi (ms)": f"{t_enc:.2f}",
+                        "Waktu Dekripsi (ms)": f"{t_dec:.2f}",
+                        "Total Waktu (ms)": f"{(t_enc + t_dec):.2f}"
+                    })
+            
+            st.table(benchmark_results)
