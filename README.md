@@ -1,3 +1,7 @@
+DWIKI MUHAMMAD WASFI    247006111136
+AJIB NASRULLAH          247006111126
+REZA PAHRI FAUZI        247006111124
+
 # Modul kriptografi Topik A
 
 Modul Python untuk mengenkripsi dan mendekripsi teks atau berkas dengan
