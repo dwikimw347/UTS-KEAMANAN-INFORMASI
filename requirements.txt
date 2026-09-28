@@ -1,1 +1,2 @@
 cryptography>=42,<52
+streamlit>=1.30
