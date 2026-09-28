@@ -153,7 +153,6 @@ if mode_data == "Modul Teks":
                         key_hex = get_key_from_encrypted_payload(raw_bytes, password)
                         
                         st.success("Otentikasi valid. Dekripsi berhasil.")
-                        st.text_input("Kunci Turunan Scrypt 256-bit (HEX)", value=key_hex, help="Kunci dekripsi yang diekstrak menggunakan Salt dari paket.")
                         st.text_area("Plaintext Dipulihkan", value=decrypted, height=140)
                     except DecryptionFailed:
                         st.error("Gagal mendekripsi: Kata sandi salah atau isi data telah terubah.")
@@ -235,7 +234,6 @@ else:
                         out_name = orig_name[:-7] if orig_name.endswith(".kripto") else f"restored_{orig_name}"
                         
                         st.success("Otentikasi sukses. Berkas dipulihkan.")
-                        st.text_input("Kunci Turunan Scrypt 256-bit (HEX)", value=key_hex)
                         
                         st.download_button(
                             label=f"Unduh {out_name}",
