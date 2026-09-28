@@ -64,5 +64,7 @@ menyimpannya di kode sumber atau repositori.
 
 ## Cara Running
 
+```powershell
 pip install streamlit cryptography
 python -m streamlit run app.py
+```
