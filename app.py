@@ -28,28 +28,54 @@ st.markdown(
     """
     <style>
     .stApp {
-        background-color: #0d1117;
-        color: #c9d1d9;
+        background-color: #0d1117 !important;
+        color: #c9d1d9 !important;
     }
+    
     .block-container {
         padding-top: 2rem;
         max-width: 1200px;
     }
+
+    label, p, span, div {
+        color: #c9d1d9 !important;
+    }
+
+    /* Style Kolom / Card Container */
     [data-testid="column"] > div {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: #161b22 !important;
+        border: 1px solid #30363d !important;
         border-radius: 8px;
         padding: 20px;
     }
+
+    /* Style untuk Input Box, Selectbox, & Uploader */
+    input, textarea, [data-baseweb="select"] > div {
+        background-color: #21262d !important;
+        color: #ffffff !important;
+        border-color: #30363d !important;
+    }
+
+    /*Segmented Control (Navigasi Modul) */
+    div[data-baseweb="segmented-control"] {
+        background-color: #21262d !important;
+        border-radius: 8px;
+    }
+    div[data-baseweb="segmented-control"] button {
+        color: #c9d1d9 !important;
+    }
+
+    /* Style Tombol Utama */
     div.stButton > button[kind="primary"] {
-        background-color: #238636;
-        border: 1px solid rgba(240,246,252,0.1);
-        color: #ffffff;
+        background-color: #238636 !important;
+        border: 1px solid rgba(240,246,252,0.1) !important;
+        color: #ffffff !important;
         font-weight: 600;
     }
     div.stButton > button[kind="primary"]:hover {
-        background-color: #2ea043;
+        background-color: #2ea043 !important;
     }
+
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
