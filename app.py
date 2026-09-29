@@ -104,7 +104,7 @@ def calculate_entropy(data: bytes) -> float:
 st.title("Enkripsi & Dekripsi")
 st.caption("Platform Enkripsi & Dekripsi")
 
-# Modul Navigasi Utama (Diperbaiki: Menambahkan Pengujian ke Menu Navigasi)
+# Modul Navigasi Utama
 mode_data = st.segmented_control(
     "Target Pemrosesan Data",
     options=["Modul Teks", "Modul Berkas", "Pengujian"],
