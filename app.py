@@ -219,7 +219,7 @@ if mode_data == "Modul Teks":
                     except Exception as err:
                         st.error(f"Gagal memproses data: {err}")
         else:
-            st.info("Hasil pemrosesan dan kunci akan ditampilkan di area ini setelah tombol dijalankan.")
+            st.info("Hasil pemrosesan akan ditampilkan di area ini setelah tombol dijalankan.")
 
 # ==========================================
 # MODUL BERKAS
